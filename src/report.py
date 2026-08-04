@@ -52,13 +52,24 @@ def _closing_note(row: dict) -> str:
     return "Verificar en SECOP"
 
 
+def _extract_url(value) -> str:
+    """
+    Socrata columns typed as "URL" (like urlproceso) serialize as a dict --
+    typically {"url": "...", "description": "..."} -- not a plain string.
+    This normalizes either shape to a plain string.
+    """
+    if isinstance(value, dict):
+        return value.get("url") or value.get("description") or ""
+    return value or ""
+
+
 def _card(row: dict, rank: int) -> str:
     f = config.FIELDS
     e = html.escape
     priority = row.get("_prioridad", "media")
     color = PRIORITY_COLORS.get(priority, "#6b6b6b")
 
-    url = row.get(f["url"]) or ""
+    url = _extract_url(row.get(f["url"]))
     link = (
         f'<a href="{e(url)}" style="color:#1a5490;text-decoration:none;font-weight:600;">'
         f"Ver proceso en SECOP II &rarr;</a>"
