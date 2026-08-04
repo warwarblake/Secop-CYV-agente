@@ -127,6 +127,9 @@ def rank(candidates: list[dict]) -> list[dict]:
         },
         timeout=180,
     )
+    if resp.status_code != 200:
+        print(f"Anthropic API returned {resp.status_code}. Response body:")
+        print(resp.text[:2000])
     resp.raise_for_status()
 
     text = "".join(
