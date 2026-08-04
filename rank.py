@@ -89,19 +89,9 @@ codigo. Formato exacto:
                 Si ningun proyecto anterior es realmente comparable, escribe
                 exactamente: Sin antecedente directo comparable -- nunca
                 fuerces un paralelo debil.",
-    "experiencia_estimada": "En lenguaje sencillo, que experiencia
-                probablemente exigira el pliego: tipo de obra similar,
-                cuantos contratos anteriores, y que magnitud. Basate en el
-                objeto, el valor y la modalidad. Si no tienes base suficiente
-                para estimar, escribe exactamente: Requiere revisar el pliego.",
     "prioridad": "alta" | "media" | "baja",
     "alerta": "Un riesgo o advertencia en una frase, o cadena vacia."}}
 ]}}
-
-REGLA CRITICA sobre "experiencia_estimada": es una ESTIMACION tuya, no un dato
-publicado. Nunca cites cifras, porcentajes en SMMLV ni numeros de contratos
-como si fueran textuales del pliego. Usa lenguaje de probabilidad
-("probablemente exigira", "es tipico que pidan").
 
 REGLA CRITICA sobre "proyectos_relacionados": solo cita proyectos que
 aparecen literalmente en la lista de PROYECTOS ANTERIORES de arriba. Nunca
@@ -170,7 +160,6 @@ def rank(candidates: list[dict]) -> list[dict]:
                 "_resumen": "",
                 "_encaje": "",
                 "_proyectos_relacionados": "",
-                "_experiencia": "Requiere revisar el pliego.",
                 "_prioridad": "media",
                 "_alerta": "",
             }
@@ -186,7 +175,6 @@ def rank(candidates: list[dict]) -> list[dict]:
         row["_resumen"] = item.get("resumen", "")
         row["_encaje"] = item.get("encaje", "")
         row["_proyectos_relacionados"] = item.get("proyectos_relacionados", "")
-        row["_experiencia"] = item.get("experiencia_estimada", "")
         row["_prioridad"] = item.get("prioridad", "media")
         row["_alerta"] = item.get("alerta", "")
         selected.append(row)
