@@ -53,6 +53,10 @@ estudiar un proceso a fondo.
 PERFIL DE LA EMPRESA:
 {profile}
 
+PROYECTOS ANTERIORES DE LA EMPRESA (cita estos por nombre cuando expliques
+el encaje -- no describas la experiencia solo en abstracto):
+{past_projects}
+
 A continuacion hay {n} procesos de contratacion publica abiertos en la region
 Caribe, obtenidos de SECOP II. Selecciona los {top_n} que mejor se ajustan.
 
@@ -78,6 +82,13 @@ codigo. Formato exacto:
                 a alguien en treinta segundos.",
     "encaje": "Una o dos frases sobre por que encaja con la experiencia
                de la empresa.",
+    "proyectos_relacionados": "Nombra 1 o 2 proyectos ESPECIFICOS de la
+                lista de PROYECTOS ANTERIORES que mas se parezcan a este
+                proceso, y en una frase explica el paralelo tecnico (mismo
+                tipo de obra, escala similar, mismo tipo de entidad, etc.).
+                Si ningun proyecto anterior es realmente comparable, escribe
+                exactamente: Sin antecedente directo comparable -- nunca
+                fuerces un paralelo debil.",
     "experiencia_estimada": "En lenguaje sencillo, que experiencia
                 probablemente exigira el pliego: tipo de obra similar,
                 cuantos contratos anteriores, y que magnitud. Basate en el
@@ -91,6 +102,10 @@ REGLA CRITICA sobre "experiencia_estimada": es una ESTIMACION tuya, no un dato
 publicado. Nunca cites cifras, porcentajes en SMMLV ni numeros de contratos
 como si fueran textuales del pliego. Usa lenguaje de probabilidad
 ("probablemente exigira", "es tipico que pidan").
+
+REGLA CRITICA sobre "proyectos_relacionados": solo cita proyectos que
+aparecen literalmente en la lista de PROYECTOS ANTERIORES de arriba. Nunca
+inventes un proyecto que la empresa no ha hecho.
 
 El campo "indice" debe ser el numero entre corchetes del proceso. Devuelve
 exactamente {top_n} elementos, ordenados del mejor al menos bueno.
@@ -106,8 +121,14 @@ def rank(candidates: list[dict]) -> list[dict]:
     top_n = min(config.TOP_N, len(candidates))
 
     blocks = "\n".join(_summarize(row, i) for i, row in enumerate(candidates[:60]))
+    past_projects_lines = []
+    for category, projects in config.PAST_PROJECTS.items():
+        past_projects_lines.append(f"\n{category}:")
+        past_projects_lines.extend(f"  - {p}" for p in projects)
+    past_projects_txt = "\n".join(past_projects_lines)
     prompt = PROMPT.format(
         profile=config.COMPANY_PROFILE,
+        past_projects=past_projects_txt,
         n=len(candidates[:60]),
         top_n=top_n,
         candidates=blocks,
@@ -148,6 +169,7 @@ def rank(candidates: list[dict]) -> list[dict]:
                 **row,
                 "_resumen": "",
                 "_encaje": "",
+                "_proyectos_relacionados": "",
                 "_experiencia": "Requiere revisar el pliego.",
                 "_prioridad": "media",
                 "_alerta": "",
@@ -163,6 +185,7 @@ def rank(candidates: list[dict]) -> list[dict]:
         row = dict(candidates[idx])
         row["_resumen"] = item.get("resumen", "")
         row["_encaje"] = item.get("encaje", "")
+        row["_proyectos_relacionados"] = item.get("proyectos_relacionados", "")
         row["_experiencia"] = item.get("experiencia_estimada", "")
         row["_prioridad"] = item.get("prioridad", "media")
         row["_alerta"] = item.get("alerta", "")
