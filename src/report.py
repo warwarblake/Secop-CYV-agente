@@ -63,11 +63,32 @@ def _extract_url(value) -> str:
     return value or ""
 
 
+def _tracking_badge(row: dict) -> str:
+    """
+    'NUEVO HOY' for a process appearing for the first time, or 'En
+    seguimiento desde DD/MM' for one that's been a strong match before and
+    is still showing up -- so Claudia can tell continuity from novelty at
+    a glance, without it looking like a stale repeat of yesterday's email.
+    """
+    first_seen = row.get("_first_seen")
+    if not first_seen:
+        return ""
+    today_iso = datetime.now(BOGOTA).date().isoformat()
+    if first_seen == today_iso:
+        return "NUEVO HOY"
+    try:
+        d = datetime.fromisoformat(first_seen)
+        return f"En seguimiento desde {d.strftime('%d/%m')}"
+    except ValueError:
+        return ""
+
+
 def _card(row: dict, rank: int) -> str:
     f = config.FIELDS
     e = html.escape
     priority = row.get("_prioridad", "media")
     color = PRIORITY_COLORS.get(priority, "#6b6b6b")
+    badge = _tracking_badge(row)
 
     url = _extract_url(row.get(f["url"]))
     link = (
@@ -92,7 +113,7 @@ def _card(row: dict, rank: int) -> str:
           <table width="100%" cellpadding="0" cellspacing="0">
             <tr>
               <td style="font-size:12px;letter-spacing:1px;text-transform:uppercase;color:{color};font-weight:700;">
-                #{rank} &middot; Prioridad {e(priority)}
+                #{rank} &middot; Prioridad {e(priority)}{f' &middot; {e(badge)}' if badge else ''}
               </td>
             </tr>
             <tr><td style="padding:6px 0 0 0;font-size:17px;line-height:1.35;font-weight:600;color:#1a1a1a;">
@@ -121,11 +142,16 @@ def _card(row: dict, rank: int) -> str:
               {e(row.get('_encaje') or 'Coincide con las lineas de negocio de la empresa.')}
             </td></tr>
 
+            <tr><td style="padding:12px 0 0 0;font-size:14px;line-height:1.55;color:#2a2a2a;">
+              <strong style="font-size:11px;letter-spacing:1px;text-transform:uppercase;color:#777;">Proyectos previos de CYV relacionados</strong><br>
+              {e(row.get('_proyectos_relacionados') or 'Sin antecedente directo comparable.')}
+            </td></tr>
+
             <tr><td style="padding:12px 0 0 0;">
               <table width="100%" cellpadding="0" cellspacing="0" style="background:#f7f4ec;border:1px dashed #d6cfbc;">
                 <tr><td style="padding:12px;font-size:13px;line-height:1.55;color:#4a4335;">
                   <strong style="font-size:11px;letter-spacing:1px;text-transform:uppercase;color:#8a7a4f;">
-                    Experiencia probable &middot; ESTIMACION
+                    Experiencia requerida &middot; ESTIMACION
                   </strong><br>
                   {e(row.get('_experiencia') or 'Requiere revisar el pliego.')}
                   <br><span style="color:#8a7a4f;font-style:italic;">

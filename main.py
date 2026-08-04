@@ -23,24 +23,26 @@ STATE_FILE = pathlib.Path("state/seen.json")
 BOGOTA = timezone(timedelta(hours=-5))
 
 
-def load_seen() -> set[str]:
+def load_seen() -> dict:
+    """Returns {process_id: first_seen_date_iso}."""
     if not STATE_FILE.exists():
-        return set()
+        return {}
     try:
-        return set(json.loads(STATE_FILE.read_text()).get("process_ids", []))
+        return json.loads(STATE_FILE.read_text()).get("process_ids", {})
     except (json.JSONDecodeError, OSError):
-        return set()
+        return {}
 
 
-def save_seen(ids: set[str]) -> None:
+def save_seen(seen: dict) -> None:
     STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
     STATE_FILE.write_text(
         json.dumps(
             {
                 "updated": datetime.now(timezone.utc).isoformat(),
-                "process_ids": sorted(ids),
+                "process_ids": seen,
             },
             indent=2,
+            sort_keys=True,
         )
     )
 
@@ -130,28 +132,40 @@ def main() -> int:
     dry_run = "--dry-run" in args
 
     candidates = secop.get_candidates()
-    seen = load_seen()
+    seen = load_seen()  # {process_id: first_seen_date_iso}
 
     pid_field = config.FIELDS["process_id"]
-    new_ids = {r.get(pid_field) for r in candidates if r.get(pid_field) not in seen}
-    new_ids.discard(None)
+    today_str = datetime.now(BOGOTA).date().isoformat()
+
+    # Rebuild state from scratch, keyed off TODAY's candidates only. Anything
+    # not in today's candidate pool (closed, fell out of the lookback window,
+    # no longer matches the filters) is simply not carried forward -- this
+    # keeps the file from growing forever without needing separate cleanup.
+    new_seen = {}
+    newly_added_count = 0
+    for row in candidates:
+        pid = row.get(pid_field)
+        if not pid:
+            continue
+        if pid in seen:
+            new_seen[pid] = seen[pid]
+        else:
+            new_seen[pid] = today_str
+            newly_added_count += 1
+        row["_first_seen"] = new_seen[pid]
 
     print(f"Candidates after filtering: {len(candidates)}")
-    print(f"New since last run: {len(new_ids)}")
+    print(f"New today: {newly_added_count}")
 
     if not candidates:
         print("Nothing matched. No email sent.")
         return 0
 
-    # Only send if something is actually new. Otherwise the recipient gets the
-    # same five processes every morning and stops reading within a week.
-    if not new_ids and not dry_run:
-        print("No new processes today. Skipping send.")
-        return 0
-
-    # Put new processes first so the model sees them at the top of the list.
-    candidates.sort(key=lambda r: r.get(pid_field) not in seen)
-
+    # No longer gated on "something new today" -- a genuinely good match
+    # should keep appearing in the top 5 for as long as it's still open and
+    # still the best fit. Truly new candidates naturally compete for a spot
+    # in the ranking below, so the list still shifts as new things appear or
+    # old ones stop being the best 5.
     selected = rank.rank(candidates)
     if not selected:
         print("Ranking returned nothing. No email sent.")
@@ -160,7 +174,7 @@ def main() -> int:
     stats = {
         "scanned": len(candidates),
         "candidates": len(candidates),
-        "new": len(new_ids),
+        "new": newly_added_count,
     }
     html_body = report.render(selected, stats)
 
@@ -171,7 +185,7 @@ def main() -> int:
 
     today = datetime.now(BOGOTA).strftime("%d/%m/%Y")
     report.send(html_body, f"Oportunidades SECOP II - Region Caribe - {today}")
-    save_seen(seen | {r.get(pid_field) for r in candidates if r.get(pid_field)})
+    save_seen(new_seen)
     print(f"Sent {len(selected)} opportunities.")
     return 0
 
