@@ -39,17 +39,55 @@ def _date(value) -> str:
         return str(value)[:10]
 
 
-def _closing_note(row: dict) -> str:
-    """
-    Returns the real bid-submission deadline once config.FIELDS['closes'] is
-    mapped and populated for this row. Until then, points to the SECOP page
-    directly rather than showing a blank or fabricated date.
-    """
+def _days_until_close(row: dict) -> int | None:
+    """Returns whole days remaining until the bid deadline, or None if unknown."""
     f = config.FIELDS
     closes_field = f.get("closes")
-    if closes_field and row.get(closes_field):
-        return _date(row.get(closes_field))
-    return "Verificar en SECOP"
+    if not closes_field:
+        return None
+    raw = row.get(closes_field)
+    if not raw:
+        return None
+    try:
+        closes_dt = datetime.fromisoformat(str(raw).replace("Z", "+00:00"))
+        if closes_dt.tzinfo is None:
+            closes_dt = closes_dt.replace(tzinfo=timezone.utc)
+    except ValueError:
+        return None
+    delta = closes_dt.astimezone(BOGOTA).date() - datetime.now(BOGOTA).date()
+    return delta.days
+
+
+def _closing_note(row: dict) -> tuple[str, str]:
+    """
+    Returns (countdown_text, color). Countdown reads "Cierra en N dias"
+    instead of a bare date, so Claudia doesn't have to do the math herself
+    each morning. Falls back to "Verificar en SECOP" when the deadline
+    field isn't populated for this row -- never a blank or a guess.
+
+    Color escalates as the deadline approaches: normal text at 8+ days,
+    amber inside a week, red inside 3 days. Processes past their deadline
+    are already filtered out upstream (secop.filter_not_overdue), but this
+    stays defensive against a 0-or-negative edge case rather than assuming.
+    """
+    days = _days_until_close(row)
+    if days is None:
+        return "Verificar en SECOP", "#333333"
+
+    f = config.FIELDS
+    date_str = _date(row.get(f.get("closes")))
+
+    if days < 0:
+        return f"Cierre vencido ({date_str})", "#8a2b2b"
+    if days == 0:
+        return f"Cierra HOY ({date_str})", "#8a2b2b"
+    if days == 1:
+        return f"Cierra manana ({date_str})", "#8a2b2b"
+    if days <= 3:
+        return f"Cierra en {days} dias ({date_str})", "#8a2b2b"
+    if days <= 7:
+        return f"Cierra en {days} dias ({date_str})", "#8a6d1f"
+    return f"Cierra en {days} dias ({date_str})", "#333333"
 
 
 def _extract_url(value) -> str:
@@ -89,6 +127,7 @@ def _card(row: dict, rank: int) -> str:
     priority = row.get("_prioridad", "media")
     color = PRIORITY_COLORS.get(priority, "#6b6b6b")
     badge = _tracking_badge(row)
+    closing_text, closing_color = _closing_note(row)
 
     url = _extract_url(row.get(f["url"]))
     link = (
@@ -127,7 +166,7 @@ def _card(row: dict, rank: int) -> str:
               <table cellpadding="0" cellspacing="0" style="font-size:13px;color:#333;">
                 <tr>
                   <td style="padding:3px 24px 3px 0;"><strong>Valor base</strong><br>{_cop(row.get(f['base_price']))}</td>
-                  <td style="padding:3px 24px 3px 0;"><strong>Presentaci&oacute;n de ofertas (fecha l&iacute;mite)</strong><br>{e(_closing_note(row))}</td>
+                  <td style="padding:3px 24px 3px 0;"><strong>Presentaci&oacute;n de ofertas</strong><br><span style="color:{closing_color};font-weight:600;">{e(closing_text)}</span></td>
                   <td style="padding:3px 0;"><strong>Modalidad</strong><br>{e(row.get(f['modality']) or 'N/D')}</td>
                 </tr>
               </table>
