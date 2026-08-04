@@ -47,19 +47,41 @@ def save_seen(ids: set[str]) -> None:
 
 def do_inspect() -> int:
     print("Live columns in SECOP II dataset", config.DATASET_ID)
-    print("-" * 60)
-    columns = secop.inspect_schema()
-    for col in columns:
-        print(" ", col)
-    print("-" * 60)
+    print("(from dataset metadata, not a sampled row -- see comment in secop.py)")
+    print("-" * 70)
+    schema = secop.inspect_schema()
+    field_names = {c["fieldName"] for c in schema}
+    for c in schema:
+        print(f"  {c['fieldName']:40s} | {c['name']}")
+    print("-" * 70)
+
+    print("\nColumns whose Spanish label mentions offers/deadline/reception ")
+    print("(one of these should be your bid-submission-deadline field,")
+    print("e.g. 'Presentacion de Ofertas'):\n")
+    deadline_hints = [
+        c for c in schema
+        if c["name"] and any(
+            term in secop.normalize(c["name"])
+            for term in ["oferta", "presentacion", "recepcion", "cierre"]
+        )
+    ]
+    if deadline_hints:
+        for c in deadline_hints:
+            print(f"  {c['fieldName']:40s} | {c['name']}")
+    else:
+        print("  (none found -- this dataset may not track that date at all)")
+
     print("\nChecking config.FIELDS against this schema:\n")
     ok = True
     for label, field in config.FIELDS.items():
-        if field in columns:
+        if field is None:
+            print(f"  SKIPPED {label:12s} -> not mapped yet")
+            continue
+        if field in field_names:
             print(f"  OK      {label:12s} -> {field}")
         else:
             ok = False
-            guesses = [c for c in columns if field.split("_")[0] in c][:3]
+            guesses = [c["fieldName"] for c in schema if field.split("_")[0] in (c["fieldName"] or "")][:3]
             hint = f"  did you mean: {', '.join(guesses)}" if guesses else ""
             print(f"  MISSING {label:12s} -> {field}{hint}")
     print()

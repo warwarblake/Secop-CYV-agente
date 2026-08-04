@@ -39,15 +39,30 @@ def _headers() -> dict:
     return {"X-App-Token": token} if token else {}
 
 
-def inspect_schema() -> list[str]:
-    """Fetch one row and return its column names. Run this first."""
-    url = f"{config.SOCRATA_DOMAIN}/resource/{config.DATASET_ID}.json"
-    resp = requests.get(url, params={"$limit": 1}, headers=_headers(), timeout=60)
+def inspect_schema() -> list[dict]:
+    """
+    Fetch the dataset's real column list from Socrata's metadata endpoint.
+
+    IMPORTANT: this deliberately does NOT sample a data row to infer columns.
+    Socrata's JSON rows omit any field that's empty for that specific record,
+    so a single sampled row can easily under-report the schema -- exactly
+    what happened with the bid-deadline field, which just wasn't populated
+    on the one process that got sampled. The metadata endpoint lists every
+    column the dataset defines, regardless of what any individual row has.
+
+    Returns a list of {"fieldName": ..., "name": ...} -- fieldName is what
+    you use in SoQL queries and config.FIELDS; name is the human-readable
+    label as it appears in SECOP's own UI, which is what you match against
+    when you know a field by its Spanish name (e.g. "Presentacion de Ofertas").
+    """
+    url = f"{config.SOCRATA_DOMAIN}/api/views/{config.DATASET_ID}.json"
+    resp = requests.get(url, headers=_headers(), timeout=60)
     resp.raise_for_status()
-    rows = resp.json()
-    if not rows:
-        return []
-    return sorted(rows[0].keys())
+    columns = resp.json().get("columns", [])
+    return sorted(
+        [{"fieldName": c.get("fieldName"), "name": c.get("name")} for c in columns],
+        key=lambda c: c["fieldName"] or "",
+    )
 
 
 def fetch_recent_processes() -> list[dict]:
@@ -162,6 +177,38 @@ def filter_open(rows: list[dict]) -> list[dict]:
     return out
 
 
+def filter_not_overdue(rows: list[dict]) -> list[dict]:
+    """
+    Drop any process whose bid-submission deadline has already passed.
+
+    Only acts once config.FIELDS['closes'] is mapped to a real field --
+    until then this is a no-op, since we have nothing reliable to check
+    against and would rather show an unconfirmed date than wrongly drop
+    a real opportunity.
+    """
+    field = config.FIELDS.get("closes")
+    if not field or not config.EXCLUDE_OVERDUE:
+        return rows
+
+    now = datetime.now(timezone.utc)
+    kept = []
+    for row in rows:
+        raw = row.get(field)
+        if not raw:
+            kept.append(row)  # no deadline on record -- keep, let Claudia verify
+            continue
+        try:
+            dt = datetime.fromisoformat(str(raw).replace("Z", "+00:00"))
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+        except ValueError:
+            kept.append(row)  # unparseable -- keep rather than silently drop
+            continue
+        if dt >= now:
+            kept.append(row)
+    return kept
+
+
 def dedupe(rows: list[dict]) -> list[dict]:
     seen, out = set(), []
     key = config.FIELDS["process_id"]
@@ -200,10 +247,11 @@ def sample_modalities_and_types() -> tuple[set[str], set[str]]:
 
 
 def get_candidates() -> list[dict]:
-    """Full pipeline: fetch -> department -> modality/type -> open -> relevance -> dedupe."""
+    """Full pipeline: fetch -> department -> modality/type -> open -> not overdue -> relevance -> dedupe."""
     rows = fetch_recent_processes()
     rows = filter_by_department(rows)
     rows = filter_by_modality(rows)
     rows = filter_open(rows)
+    rows = filter_not_overdue(rows)
     rows = filter_by_relevance(rows)
     return dedupe(rows)

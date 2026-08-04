@@ -61,7 +61,9 @@ Criterios de seleccion, en orden de importancia:
 2. Cercania geografica. Barranquilla y el resto del Atlantico pesan mas que
    los demas departamentos; luego Cartagena y Santa Marta.
 3. Valor dentro o cerca del rango historico de la empresa.
-4. Plazo de cierre que todavia permite preparar una oferta.
+4. Plazo de cierre (presentacion de ofertas) que todavia permite preparar
+   una oferta. Si el campo de cierre no aparece en el proceso, dilo en la
+   alerta -- nunca inventes ni asumas una fecha.
 
 PROCESOS:
 {candidates}

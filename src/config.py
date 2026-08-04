@@ -39,10 +39,22 @@ FIELDS = {
     "closes":       "fecha_de_recepcion_de",
     "duration":     "duracion",
     "duration_unit": "unidad_de_duracion",
+    # Bid-submission deadline (what SECOP's UI calls "Presentacion de
+    # Ofertas"). Left as None until confirmed against real metadata --
+    # run `python main.py --inspect` and look at the "mentions
+    # offers/deadline/reception" section it prints, then paste the
+    # correct fieldName here. Do NOT guess: an accidental wrong field
+    # here could show Claudia a fabricated deadline.
+    "closes":       None,
     "unspsc":       "codigo_principal_de_categoria",
     "contract_type": "tipo_de_contrato",
     "url":          "urlproceso",
 }
+
+# If True and "closes" is mapped, any process whose deadline has already
+# passed is dropped before ranking -- never send an opportunity Claudia
+# can no longer act on. Has no effect while "closes" is None above.
+EXCLUDE_OVERDUE = True
 
 # Claudia Duran is the recipient at CYV. Her stated requirements, in order:
 #   1. exact link to the process

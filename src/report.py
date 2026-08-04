@@ -39,6 +39,19 @@ def _date(value) -> str:
         return str(value)[:10]
 
 
+def _closing_note(row: dict) -> str:
+    """
+    Returns the real bid-submission deadline once config.FIELDS['closes'] is
+    mapped and populated for this row. Until then, points to the SECOP page
+    directly rather than showing a blank or fabricated date.
+    """
+    f = config.FIELDS
+    closes_field = f.get("closes")
+    if closes_field and row.get(closes_field):
+        return _date(row.get(closes_field))
+    return "Verificar en SECOP"
+
+
 def _card(row: dict, rank: int) -> str:
     f = config.FIELDS
     e = html.escape
@@ -82,7 +95,7 @@ def _card(row: dict, rank: int) -> str:
               <table cellpadding="0" cellspacing="0" style="font-size:13px;color:#333;">
                 <tr>
                   <td style="padding:3px 24px 3px 0;"><strong>Valor base</strong><br>{_cop(row.get(f['base_price']))}</td>
-                  <td style="padding:3px 24px 3px 0;"><strong>Cierre</strong><br>{_date(row.get(f['closes']))}</td>
+                  <td style="padding:3px 24px 3px 0;"><strong>Presentaci&oacute;n de ofertas (fecha l&iacute;mite)</strong><br>{e(_closing_note(row))}</td>
                   <td style="padding:3px 0;"><strong>Modalidad</strong><br>{e(row.get(f['modality']) or 'N/D')}</td>
                 </tr>
               </table>
