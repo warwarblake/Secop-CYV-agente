@@ -8,13 +8,32 @@ old-fashioned markup.
 
 from __future__ import annotations
 
+import base64
 import html
 import os
+import pathlib
 from datetime import datetime, timedelta, timezone
 
 from . import config
 
 BOGOTA = timezone(timedelta(hours=-5))
+
+# The real CYV logo, extracted directly from Anexo_Obras_CYV_2026.pdf (the
+# document Claudia sent) rather than approximated. Encoded as a base64 data
+# URI so it's embedded directly in the HTML -- no external image hosting,
+# no "click to show images" prompt in the inbox, and it renders identically
+# whether the file is actually emailed or just opened locally as preview.html.
+_LOGO_PATH = pathlib.Path(__file__).parent.parent / "assets" / "cyv_logo.png"
+_BRAND_YELLOW = "#face13"  # sampled directly from the logo's triangle mark
+
+
+def _logo_data_uri() -> str:
+    try:
+        data = _LOGO_PATH.read_bytes()
+        b64 = base64.b64encode(data).decode("ascii")
+        return f"data:image/png;base64,{b64}"
+    except FileNotFoundError:
+        return ""
 
 PRIORITY_COLORS = {
     "alta": "#0f7b3f",
@@ -39,17 +58,55 @@ def _date(value) -> str:
         return str(value)[:10]
 
 
-def _closing_note(row: dict) -> str:
-    """
-    Returns the real bid-submission deadline once config.FIELDS['closes'] is
-    mapped and populated for this row. Until then, points to the SECOP page
-    directly rather than showing a blank or fabricated date.
-    """
+def _days_until_close(row: dict) -> int | None:
+    """Returns whole days remaining until the bid deadline, or None if unknown."""
     f = config.FIELDS
     closes_field = f.get("closes")
-    if closes_field and row.get(closes_field):
-        return _date(row.get(closes_field))
-    return "Verificar en SECOP"
+    if not closes_field:
+        return None
+    raw = row.get(closes_field)
+    if not raw:
+        return None
+    try:
+        closes_dt = datetime.fromisoformat(str(raw).replace("Z", "+00:00"))
+        if closes_dt.tzinfo is None:
+            closes_dt = closes_dt.replace(tzinfo=timezone.utc)
+    except ValueError:
+        return None
+    delta = closes_dt.astimezone(BOGOTA).date() - datetime.now(BOGOTA).date()
+    return delta.days
+
+
+def _closing_note(row: dict) -> tuple[str, str]:
+    """
+    Returns (countdown_text, color). Countdown reads "Cierra en N dias"
+    instead of a bare date, so Claudia doesn't have to do the math herself
+    each morning. Falls back to "Verificar en SECOP" when the deadline
+    field isn't populated for this row -- never a blank or a guess.
+
+    Color escalates as the deadline approaches: normal text at 8+ days,
+    amber inside a week, red inside 3 days. Processes past their deadline
+    are already filtered out upstream (secop.filter_not_overdue), but this
+    stays defensive against a 0-or-negative edge case rather than assuming.
+    """
+    days = _days_until_close(row)
+    if days is None:
+        return "Verificar en SECOP", "#333333"
+
+    f = config.FIELDS
+    date_str = _date(row.get(f.get("closes")))
+
+    if days < 0:
+        return f"Cierre vencido ({date_str})", "#8a2b2b"
+    if days == 0:
+        return f"Cierra HOY ({date_str})", "#8a2b2b"
+    if days == 1:
+        return f"Cierra manana ({date_str})", "#8a2b2b"
+    if days <= 3:
+        return f"Cierra en {days} dias ({date_str})", "#8a2b2b"
+    if days <= 7:
+        return f"Cierra en {days} dias ({date_str})", "#8a6d1f"
+    return f"Cierra en {days} dias ({date_str})", "#333333"
 
 
 def _extract_url(value) -> str:
@@ -89,6 +146,7 @@ def _card(row: dict, rank: int) -> str:
     priority = row.get("_prioridad", "media")
     color = PRIORITY_COLORS.get(priority, "#6b6b6b")
     badge = _tracking_badge(row)
+    closing_text, closing_color = _closing_note(row)
 
     url = _extract_url(row.get(f["url"]))
     link = (
@@ -127,7 +185,7 @@ def _card(row: dict, rank: int) -> str:
               <table cellpadding="0" cellspacing="0" style="font-size:13px;color:#333;">
                 <tr>
                   <td style="padding:3px 24px 3px 0;"><strong>Valor base</strong><br>{_cop(row.get(f['base_price']))}</td>
-                  <td style="padding:3px 24px 3px 0;"><strong>Presentaci&oacute;n de ofertas (fecha l&iacute;mite)</strong><br>{e(_closing_note(row))}</td>
+                  <td style="padding:3px 24px 3px 0;"><strong>Presentaci&oacute;n de ofertas</strong><br><span style="color:{closing_color};font-weight:600;">{e(closing_text)}</span></td>
                   <td style="padding:3px 0;"><strong>Modalidad</strong><br>{e(row.get(f['modality']) or 'N/D')}</td>
                 </tr>
               </table>
@@ -147,19 +205,6 @@ def _card(row: dict, rank: int) -> str:
               {e(row.get('_proyectos_relacionados') or 'Sin antecedente directo comparable.')}
             </td></tr>
 
-            <tr><td style="padding:12px 0 0 0;">
-              <table width="100%" cellpadding="0" cellspacing="0" style="background:#f7f4ec;border:1px dashed #d6cfbc;">
-                <tr><td style="padding:12px;font-size:13px;line-height:1.55;color:#4a4335;">
-                  <strong style="font-size:11px;letter-spacing:1px;text-transform:uppercase;color:#8a7a4f;">
-                    Experiencia requerida &middot; ESTIMACION
-                  </strong><br>
-                  {e(row.get('_experiencia') or 'Requiere revisar el pliego.')}
-                  <br><span style="color:#8a7a4f;font-style:italic;">
-                    No es un dato publicado. Confirmar en el pliego de condiciones.
-                  </span>
-                </td></tr>
-              </table>
-            </td></tr>
             {alert_html}
             <tr><td style="padding:14px 0 0 0;font-size:14px;">{link}</td></tr>
           </table>
@@ -172,6 +217,7 @@ def _card(row: dict, rank: int) -> str:
 def render(rows: list[dict], stats: dict) -> str:
     today = datetime.now(BOGOTA).strftime("%d de %B de %Y")
     cards = "".join(_card(r, i + 1) for i, r in enumerate(rows))
+    logo_uri = _logo_data_uri()
 
     return f"""<!DOCTYPE html>
 <html><body style="margin:0;padding:0;background:#f4f2ed;font-family:Georgia,'Times New Roman',serif;">
@@ -179,17 +225,26 @@ def render(rows: list[dict], stats: dict) -> str:
 <tr><td align="center">
 <table width="640" cellpadding="0" cellspacing="0" style="max-width:640px;">
 
-  <tr><td style="padding:0 0 22px 0;border-bottom:2px solid #1a1a1a;">
-    <div style="font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#777;">
-      Reporte diario de oportunidades
-    </div>
-    <div style="font-size:26px;font-weight:700;color:#1a1a1a;padding-top:6px;">
-      Licitaciones region Caribe
-    </div>
-    <div style="font-size:13px;color:#666;padding-top:6px;">
-      {today} &middot; Fuente: SECOP II
-    </div>
+  <tr><td style="padding:0 0 18px 0;">
+    <table width="100%" cellpadding="0" cellspacing="0">
+      <tr>
+        <td valign="top">
+          <div style="font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#777;">
+            Reporte diario de oportunidades
+          </div>
+          <div style="font-size:26px;font-weight:700;color:#1a1a1a;padding-top:6px;">
+            Licitaciones region Caribe
+          </div>
+          <div style="font-size:13px;color:#666;padding-top:6px;">
+            {today} &middot; Fuente: SECOP II
+          </div>
+        </td>
+        {f'<td valign="top" align="right" width="130"><img src="{logo_uri}" width="120" alt="CYV Constructora" style="display:block;border:0;"></td>' if logo_uri else ''}
+      </tr>
+    </table>
   </td></tr>
+
+  <tr><td style="height:4px;line-height:4px;font-size:0;background-color:{_BRAND_YELLOW};">&nbsp;</td></tr>
 
   <tr><td style="padding:20px 0 22px 0;font-size:14px;line-height:1.6;color:#444;">
     Se revisaron <strong>{stats['scanned']}</strong> procesos publicados en los
@@ -202,11 +257,12 @@ def render(rows: list[dict], stats: dict) -> str:
 
   {cards}
 
-  <tr><td style="padding:18px 0 0 0;border-top:1px solid #ddd9d0;font-size:11px;line-height:1.6;color:#888;">
+  <tr><td style="padding:18px 0 0 0;border-top:2px solid {_BRAND_YELLOW};font-size:11px;line-height:1.6;color:#888;">
     Datos obtenidos del portal de datos abiertos de Colombia Compra Eficiente
     (datos.gov.co, conjunto {config.DATASET_ID}). Los valores, fechas y enlaces
     provienen directamente de SECOP II. Verifique siempre el pliego de
     condiciones oficial antes de tomar decisiones.
+    <br><span style="color:#aaa;">Generado para CYV Constructora S.A.S.</span>
   </td></tr>
 
 </table>
