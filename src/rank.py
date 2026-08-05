@@ -135,7 +135,20 @@ def rank(candidates: list[dict]) -> list[dict]:
         },
         json={
             "model": MODEL,
-            "max_tokens": 2000,
+            # Claude Sonnet 5 runs ADAPTIVE THINKING by default when the
+            # "thinking" field is omitted -- a silent change from Sonnet 4.6,
+            # which ran thinking-off. Thinking tokens count against max_tokens,
+            # so the old 2000-token budget was being eaten by thinking and the
+            # JSON came back truncated. json.loads() then raised, the fallback
+            # path below fired, and every commentary field ended up empty --
+            # which is why the email kept showing the generic placeholder text.
+            #
+            # This is a deterministic JSON extraction/ranking task, so thinking
+            # buys nothing here. Turn it off explicitly and leave generous
+            # headroom: 5 entries of Spanish commentary is ~2k tokens, so 16k
+            # is a wide margin rather than a tight fit.
+            "thinking": {"type": "disabled"},
+            "max_tokens": 16000,
             "messages": [{"role": "user", "content": prompt}],
         },
         timeout=180,
@@ -145,16 +158,37 @@ def rank(candidates: list[dict]) -> list[dict]:
         print(resp.text[:2000])
     resp.raise_for_status()
 
+    payload = resp.json()
+
+    # If the model ran out of room, everything below is truncated garbage.
+    # Say so loudly -- a silent fallback here is what made this bug look like
+    # a prompt problem for days: the email still rendered, just with every
+    # commentary field replaced by report.py's generic placeholder text.
+    if payload.get("stop_reason") == "max_tokens":
+        print(
+            "WARNING: hit max_tokens -- the model's JSON is truncated. "
+            "The report will fall back to generic placeholder text. "
+            "Raise max_tokens in src/rank.py."
+        )
+
     text = "".join(
         block.get("text", "")
-        for block in resp.json().get("content", [])
+        for block in payload.get("content", [])
         if block.get("type") == "text"
     )
     text = re.sub(r"^```(?:json)?|```$", "", text.strip(), flags=re.MULTILINE).strip()
 
     try:
         parsed = json.loads(text)
-    except json.JSONDecodeError:
+    except json.JSONDecodeError as exc:
+        print(f"ERROR: could not parse the model's JSON ({exc}).")
+        print(f"stop_reason={payload.get('stop_reason')!r}")
+        print("Raw model output follows:")
+        print(text[:3000] if text else "(empty)")
+        print(
+            "Falling back to keyword ordering -- 'Por que encaja' and "
+            "'Proyectos previos' will show placeholder text in this email."
+        )
         # Fall back to keyword-hit ordering rather than sending nothing.
         return [
             {
