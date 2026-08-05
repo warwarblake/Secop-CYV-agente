@@ -53,15 +53,21 @@ estudiar un proceso a fondo.
 PERFIL DE LA EMPRESA:
 {profile}
 
-PROYECTOS ANTERIORES DE LA EMPRESA (cita estos por nombre cuando expliques
-el encaje -- no describas la experiencia solo en abstracto):
-{past_projects}
-
 A continuacion hay {n} procesos de contratacion publica abiertos en la region
 Caribe, obtenidos de SECOP II. Selecciona los {top_n} que mejor se ajustan.
 
+Antes de seleccionar cualquier proceso, verifica su experiencia tecnica:
+compara el "Objeto" y la "Descripcion" del proceso contra CADA una de las
+LINEAS DE NEGOCIO PRINCIPALES listadas en el perfil, y contra los proyectos
+anteriores mencionados ahi (canalizacion de arroyos, colectores, vias,
+espacio publico, escenarios deportivos, edificaciones institucionales,
+restauracion patrimonial, etc). Un proceso solo debe entrar en la seleccion
+final si coincide claramente con al menos una de esas lineas. Es preferible
+devolver menos de {top_n} elementos que forzar una coincidencia debil.
+
 Criterios de seleccion, en orden de importancia:
-1. Coincidencia tecnica con las lineas de negocio de la empresa.
+1. Coincidencia tecnica verificada con las lineas de negocio de la empresa
+   (ver verificacion arriba -- esto no es opcional).
 2. Cercania geografica. Barranquilla y el resto del Atlantico pesan mas que
    los demas departamentos; luego Cartagena y Santa Marta.
 3. Valor dentro o cerca del rango historico de la empresa.
@@ -80,25 +86,42 @@ codigo. Formato exacto:
     "resumen": "UNA o DOS frases en espanol claro explicando que se va a
                 construir. Nada de jerga contractual. Como se lo explicarias
                 a alguien en treinta segundos.",
-    "encaje": "Una o dos frases sobre por que encaja con la experiencia
-               de la empresa.",
-    "proyectos_relacionados": "Nombra 1 o 2 proyectos ESPECIFICOS de la
-                lista de PROYECTOS ANTERIORES que mas se parezcan a este
-                proceso, y en una frase explica el paralelo tecnico (mismo
-                tipo de obra, escala similar, mismo tipo de entidad, etc.).
-                Si ningun proyecto anterior es realmente comparable, escribe
-                exactamente: Sin antecedente directo comparable -- nunca
-                fuerces un paralelo debil.",
+    "encaje": "Una o dos frases sobre por que encaja, nombrando
+               EXPLICITAMENTE la linea de negocio del perfil con la que
+               coincide (ej: 'obras hidraulicas urbanas', 'espacio publico
+               y urbanismo'). Prohibido responder con una frase generica
+               que aplicaria igual a cualquier proceso -- si no puedes
+               nombrar la linea de negocio especifica, ese proceso no
+               deberia estar en la seleccion.",
+    "proyectos_relacionados": "Nombra el o los proyectos anteriores de CYV
+                mencionados en el perfil que sean mas comparables en tipo
+                de obra y magnitud (por ejemplo: canalizacion del arroyo de
+                la calle 84, colector central de aguas lluvias en Monteria,
+                Plaza de la Intendencia Fluvial, Parque Estadio de
+                Atletismo en Cartagena, proyecto Bellas Artes, proyecto K7).
+                Se especifico sobre por que ese antecedente es comparable
+                (mismo tipo de obra, magnitud similar, misma region). Escribe
+                exactamente 'Sin antecedente directo comparable en el
+                perfil actual.' UNICAMENTE si de verdad ningun proyecto
+                listado en el perfil se parece, despues de haber revisado
+                todos.",
+    "experiencia_estimada": "En lenguaje sencillo, que experiencia
+                probablemente exigira el pliego: tipo de obra similar,
+                cuantos contratos anteriores, y que magnitud. Basate en el
+                objeto, el valor y la modalidad. Si no tienes base suficiente
+                para estimar, escribe exactamente: Requiere revisar el pliego.",
     "prioridad": "alta" | "media" | "baja",
     "alerta": "Un riesgo o advertencia en una frase, o cadena vacia."}}
 ]}}
 
-REGLA CRITICA sobre "proyectos_relacionados": solo cita proyectos que
-aparecen literalmente en la lista de PROYECTOS ANTERIORES de arriba. Nunca
-inventes un proyecto que la empresa no ha hecho.
+REGLA CRITICA sobre "experiencia_estimada": es una ESTIMACION tuya, no un dato
+publicado. Nunca cites cifras, porcentajes en SMMLV ni numeros de contratos
+como si fueran textuales del pliego. Usa lenguaje de probabilidad
+("probablemente exigira", "es tipico que pidan").
 
 El campo "indice" debe ser el numero entre corchetes del proceso. Devuelve
-exactamente {top_n} elementos, ordenados del mejor al menos bueno.
+como maximo {top_n} elementos, ordenados del mejor al menos bueno, y menos
+si no hay suficientes procesos que superen la verificacion de experiencia.
 """
 
 
@@ -111,14 +134,8 @@ def rank(candidates: list[dict]) -> list[dict]:
     top_n = min(config.TOP_N, len(candidates))
 
     blocks = "\n".join(_summarize(row, i) for i, row in enumerate(candidates[:60]))
-    past_projects_lines = []
-    for category, projects in config.PAST_PROJECTS.items():
-        past_projects_lines.append(f"\n{category}:")
-        past_projects_lines.extend(f"  - {p}" for p in projects)
-    past_projects_txt = "\n".join(past_projects_lines)
     prompt = PROMPT.format(
         profile=config.COMPANY_PROFILE,
-        past_projects=past_projects_txt,
         n=len(candidates[:60]),
         top_n=top_n,
         candidates=blocks,
@@ -160,6 +177,7 @@ def rank(candidates: list[dict]) -> list[dict]:
                 "_resumen": "",
                 "_encaje": "",
                 "_proyectos_relacionados": "",
+                "_experiencia": "Requiere revisar el pliego.",
                 "_prioridad": "media",
                 "_alerta": "",
             }
@@ -175,6 +193,7 @@ def rank(candidates: list[dict]) -> list[dict]:
         row["_resumen"] = item.get("resumen", "")
         row["_encaje"] = item.get("encaje", "")
         row["_proyectos_relacionados"] = item.get("proyectos_relacionados", "")
+        row["_experiencia"] = item.get("experiencia_estimada", "")
         row["_prioridad"] = item.get("prioridad", "media")
         row["_alerta"] = item.get("alerta", "")
         selected.append(row)
