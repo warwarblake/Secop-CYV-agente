@@ -1,0 +1,72 @@
+name: Reporte diario SECOP
+
+on:
+  schedule:
+    # 13:07 UTC = 08:07 America/Bogota (Colombia does not observe DST,
+    # so this is stable year-round). Offset a few minutes past the hour
+    # on purpose: GitHub's scheduler queues everyone's jobs that fire at
+    # exactly :00, so on-the-hour cron entries are the most likely to be
+    # delayed or silently dropped under load. A few minutes off avoids
+    # that queue.
+    - cron: "7 13 * * *"
+  workflow_dispatch:   # lets you trigger a run manually from the Actions tab
+    inputs:
+      mode:
+        description: "What to run"
+        type: choice
+        default: "send"
+        options:
+          - send              # the real thing: rank + email
+          - dry-run           # build the report, write preview.html, don't send
+          - inspect           # check SECOP field names against config.py
+          - list-modalities   # check Licitacion Publica / Obra spelling
+
+permissions:
+  contents: write      # needed to commit state/seen.json back to the repo
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      - name: Generar y enviar reporte
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GMAIL_ADDRESS: ${{ secrets.GMAIL_ADDRESS }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          SOCRATA_APP_TOKEN: ${{ secrets.SOCRATA_APP_TOKEN }}
+          REPORT_TO: ${{ vars.REPORT_TO }}
+          REPORT_CC: ${{ vars.REPORT_CC }}
+        run: |
+          MODE="${{ inputs.mode }}"
+          if [ "$MODE" = "send" ] || [ -z "$MODE" ]; then
+            python main.py
+          else
+            python main.py --$MODE
+          fi
+
+      - name: Publicar preview.html (si existe)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: preview
+          path: preview.html
+          if-no-files-found: ignore
+
+      - name: Guardar procesos ya reportados
+        run: |
+          git config user.name  "secop-bot"
+          git config user.email "actions@github.com"
+          git add state/seen.json
+          git diff --staged --quiet || git commit -m "state: procesos reportados $(date -u +%F)"
+          git push
