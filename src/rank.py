@@ -56,72 +56,57 @@ PERFIL DE LA EMPRESA:
 A continuacion hay {n} procesos de contratacion publica abiertos en la region
 Caribe, obtenidos de SECOP II. Selecciona los {top_n} que mejor se ajustan.
 
-Antes de seleccionar cualquier proceso, verifica su experiencia tecnica:
-compara el "Objeto" y la "Descripcion" del proceso contra CADA una de las
-LINEAS DE NEGOCIO PRINCIPALES listadas en el perfil, y contra los proyectos
-anteriores mencionados ahi (canalizacion de arroyos, colectores, vias,
-espacio publico, escenarios deportivos, edificaciones institucionales,
-restauracion patrimonial, etc). Un proceso solo debe entrar en la seleccion
-final si coincide claramente con al menos una de esas lineas. Es preferible
-devolver menos de {top_n} elementos que forzar una coincidencia debil.
+Para cada proceso seleccionado, DEBES hacer dos cosas sin excepcion:
 
-Criterios de seleccion, en orden de importancia:
-1. Coincidencia tecnica verificada con las lineas de negocio de la empresa
-   (ver verificacion arriba -- esto no es opcional).
-2. Cercania geografica. Barranquilla y el resto del Atlantico pesan mas que
-   los demas departamentos; luego Cartagena y Santa Marta.
-3. Valor dentro o cerca del rango historico de la empresa.
-4. Plazo de cierre (presentacion de ofertas) que todavia permite preparar
-   una oferta. Si el campo de cierre no aparece en el proceso, dilo en la
-   alerta -- nunca inventes ni asumas una fecha.
+PASO 1 - ENCAJE: Identifica cual LINEA DE NEGOCIO PRINCIPAL del perfil coincide
+con el proceso. Por ejemplo: "infraestructura vial urbana", "obras hidraulicas
+urbanas", "espacio publico y urbanismo", "escenarios deportivos", "edificaciones
+institucionales", "restauracion patrimonial". NUNCA escribas una respuesta generica.
+Nombra la linea especifica o no incluyas el proceso en la seleccion.
+
+PASO 2 - PROYECTOS RELACIONADOS: Para CADA proceso seleccionado, revisa la lista
+de proyectos anteriores de CYV en el perfil y encuentra los que coincidan en tipo
+de obra. Por ejemplo, si el proceso es sobre pavimentacion/vias, busca "rehabilitacion
+y construccion de vias". Si es hidraulica, busca "canalizacion del arroyo" o "colector
+central de aguas lluvias". Nombra el proyecto concreto y di POR QUE coincide
+(tipo de obra similar, magnitud parecida, region similar). Si no encuentras
+coincidencia clara despues de revisar TODO el perfil, escribe: "Sin antecedente
+directo comparable en el perfil actual."
+
+Criterios de seleccion (en orden):
+1. Coincidencia tecnica con una LINEA DE NEGOCIO PRINCIPAL (no negociable).
+2. Ubicacion geografica (Atlantico > otros).
+3. Valor dentro del rango historico de CYV.
+4. Plazo de cierre realista para preparar oferta.
 
 PROCESOS:
 {candidates}
 
-Responde UNICAMENTE con JSON valido, sin texto adicional y sin bloques de
-codigo. Formato exacto:
+Responde UNICAMENTE con JSON valido, sin texto adicional. Formato:
 
 {{"seleccion": [
   {{"indice": 0,
-    "resumen": "UNA o DOS frases en espanol claro explicando que se va a
-                construir. Nada de jerga contractual. Como se lo explicarias
-                a alguien en treinta segundos.",
-    "encaje": "Una o dos frases sobre por que encaja, nombrando
-               EXPLICITAMENTE la linea de negocio del perfil con la que
-               coincide (ej: 'obras hidraulicas urbanas', 'espacio publico
-               y urbanismo'). Prohibido responder con una frase generica
-               que aplicaria igual a cualquier proceso -- si no puedes
-               nombrar la linea de negocio especifica, ese proceso no
-               deberia estar en la seleccion.",
-    "proyectos_relacionados": "Nombra el o los proyectos anteriores de CYV
-                mencionados en el perfil que sean mas comparables en tipo
-                de obra y magnitud (por ejemplo: canalizacion del arroyo de
-                la calle 84, colector central de aguas lluvias en Monteria,
-                Plaza de la Intendencia Fluvial, Parque Estadio de
-                Atletismo en Cartagena, proyecto Bellas Artes, proyecto K7).
-                Se especifico sobre por que ese antecedente es comparable
-                (mismo tipo de obra, magnitud similar, misma region). Escribe
-                exactamente 'Sin antecedente directo comparable en el
-                perfil actual.' UNICAMENTE si de verdad ningun proyecto
-                listado en el perfil se parece, despues de haber revisado
-                todos.",
-    "experiencia_estimada": "En lenguaje sencillo, que experiencia
-                probablemente exigira el pliego: tipo de obra similar,
-                cuantos contratos anteriores, y que magnitud. Basate en el
-                objeto, el valor y la modalidad. Si no tienes base suficiente
-                para estimar, escribe exactamente: Requiere revisar el pliego.",
+    "resumen": "UNA o DOS frases explicando que se va a construir. Lenguaje claro.",
+    "encaje": "Una o dos frases nombrando LA LINEA DE NEGOCIO ESPECIFICA con la que
+               coincide (ej: 'Infraestructura vial urbana: pavimentacion y
+               rehabilitacion de vias en barrios.'). Esto NO puede ser generico.",
+    "proyectos_relacionados": "El nombre de uno o mas proyectos de CYV del perfil
+                que sean similares, con UNA frase explicando por que (tipo de obra,
+                region, magnitud). Ej: 'Rehabilitacion y construccion de vias en
+                barrios (proyecto similar en valor y tipo de obra a nivel local).'
+                O si no hay coincidencia clara: 'Sin antecedente directo comparable
+                en el perfil actual.'",
+    "experiencia_estimada": "Que experiencia exigira probablemente el pliego (obra
+                similar, numero de contratos, magnitud). Lenguaje de probabilidad.",
     "prioridad": "alta" | "media" | "baja",
-    "alerta": "Un riesgo o advertencia en una frase, o cadena vacia."}}
+    "alerta": "Riesgo o advertencia en una frase, o vacio."}}
 ]}}
 
-REGLA CRITICA sobre "experiencia_estimada": es una ESTIMACION tuya, no un dato
-publicado. Nunca cites cifras, porcentajes en SMMLV ni numeros de contratos
-como si fueran textuales del pliego. Usa lenguaje de probabilidad
-("probablemente exigira", "es tipico que pidan").
-
-El campo "indice" debe ser el numero entre corchetes del proceso. Devuelve
-como maximo {top_n} elementos, ordenados del mejor al menos bueno, y menos
-si no hay suficientes procesos que superen la verificacion de experiencia.
+REGLAS CRITICAS:
+- "encaje" DEBE nombrar la linea de negocio especifica. Prohibido generico.
+- "proyectos_relacionados" DEBE tener contenido -- o un proyecto del perfil, o
+  la frase 'Sin antecedente directo comparable en el perfil actual.'
+- Devuelve maximo {top_n} elementos. Prefiere calidad sobre cantidad.
 """
 
 
