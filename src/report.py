@@ -189,6 +189,15 @@ def _card(row: dict, rank: int) -> str:
     price_raw = row.get(f["base_price"])
     price_smmlv = _smmlv(price_raw)
 
+    # Publication date of the process. This is NOT the acto administrativo de
+    # apertura -- that date is not published in the open dataset and cannot be
+    # fetched automatically (the SECOP II process page is CAPTCHA-gated). In
+    # practice the acto is issued at or just before publication, so this is the
+    # closest true signal available, and it is labelled for what it actually is.
+    publicado = _date(row.get(f.get("published")))
+    _status_field = f.get("opening_status")
+    opening_status = (row.get(_status_field) if _status_field else "") or "N/D"
+
     url = _extract_url(row.get(f["url"]))
     link = (
         f'<a href="{e(url)}" style="color:#1a5490;text-decoration:none;font-weight:600;">'
@@ -238,7 +247,17 @@ def _card(row: dict, rank: int) -> str:
                     <strong>Modalidad</strong><br>{e(row.get(f['modality']) or 'N/D')}
                   </td>
                 </tr>
-                {f'<tr><td style="padding:10px 24px 3px 0;" valign="top"><strong>Apertura de ofertas</strong><br>{e(apertura)}</td><td colspan="2" style="padding:10px 0 3px 0;" valign="top"><strong>Estado de apertura</strong><br>{e(row.get(f.get("opening_status") or "", "") or "N/D")}</td></tr>' if apertura else ''}
+                <tr>
+                  <td style="padding:10px 24px 3px 0;" valign="top">
+                    <strong>Publicado</strong><br>{e(publicado)}
+                  </td>
+                  <td style="padding:10px 24px 3px 0;" valign="top">
+                    <strong>Apertura de ofertas</strong><br>{e(apertura or 'N/D')}
+                  </td>
+                  <td style="padding:10px 0 3px 0;" valign="top">
+                    <strong>Estado de apertura</strong><br>{e(opening_status)}
+                  </td>
+                </tr>
               </table>
             </td></tr>
             <tr><td style="padding:14px 0 0 0;font-size:14px;line-height:1.55;color:#2a2a2a;">
