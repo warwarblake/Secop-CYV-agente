@@ -17,6 +17,10 @@ import requests
 
 from . import config
 
+# Colombia has no DST, so a fixed -05:00 offset is correct year-round.
+# Deadline comparisons run on Bogota calendar dates -- see filter_not_overdue.
+BOGOTA = timezone(timedelta(hours=-5))
+
 
 # ---------------------------------------------------------------------------
 # Text normalisation -- the fix for the accent problem
@@ -190,7 +194,18 @@ def filter_not_overdue(rows: list[dict]) -> list[dict]:
     if not field or not config.EXCLUDE_OVERDUE:
         return rows
 
-    now = datetime.now(timezone.utc)
+    # Compare on the Bogota CALENDAR DATE, not on the instant.
+    #
+    # SECOP publishes these as naive midnight ("2026-08-12T00:00:00.000"),
+    # which reads as 00:00 UTC = 19:00 Bogota the PREVIOUS evening. Comparing
+    # instants therefore dropped a process the day before its deadline: the
+    # 08:00 Bogota run on the 12th is 13:00 UTC, already past 00:00 UTC on the
+    # 12th, so a process closing that very day never reached Claudia at all.
+    # That also left report._closing_note's "Cierra HOY" branch unreachable.
+    #
+    # Bids close during business hours on the stated day, so the morning of
+    # the deadline is exactly when she still wants to see it.
+    today_bogota = datetime.now(BOGOTA).date()
     kept = []
     for row in rows:
         raw = row.get(field)
@@ -199,12 +214,16 @@ def filter_not_overdue(rows: list[dict]) -> list[dict]:
             continue
         try:
             dt = datetime.fromisoformat(str(raw).replace("Z", "+00:00"))
+            # A naive SECOP timestamp is a Colombian LOCAL date, not UTC.
+            # Stamping it UTC and converting to Bogota rolls it back a day
+            # (00:00 UTC = 19:00 the previous evening), which silently dropped
+            # every process on its own deadline day.
             if dt.tzinfo is None:
-                dt = dt.replace(tzinfo=timezone.utc)
+                dt = dt.replace(tzinfo=BOGOTA)
         except ValueError:
             kept.append(row)  # unparseable -- keep rather than silently drop
             continue
-        if dt >= now:
+        if dt.astimezone(BOGOTA).date() >= today_bogota:
             kept.append(row)
     return kept
 

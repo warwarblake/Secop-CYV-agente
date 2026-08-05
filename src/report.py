@@ -107,8 +107,11 @@ def _days_until_close(row: dict) -> int | None:
         return None
     try:
         closes_dt = datetime.fromisoformat(str(raw).replace("Z", "+00:00"))
+        # Naive SECOP timestamps are Colombian LOCAL dates, not UTC. Treating
+        # them as UTC and converting to Bogota rolled the date back a day, so
+        # the countdown ran one day short of the date printed beside it.
         if closes_dt.tzinfo is None:
-            closes_dt = closes_dt.replace(tzinfo=timezone.utc)
+            closes_dt = closes_dt.replace(tzinfo=BOGOTA)
     except ValueError:
         return None
     delta = closes_dt.astimezone(BOGOTA).date() - datetime.now(BOGOTA).date()
@@ -236,15 +239,15 @@ def _card(row: dict, rank: int) -> str:
                 <tr>
                   <td style="padding:3px 24px 3px 0;" valign="top">
                     <strong>Valor base</strong><br>
-                    <span style="font-size:16px;font-weight:700;color:#1a1a1a;">{e(price_smmlv) if price_smmlv else _cop(price_raw)}</span>
-                    {f'<br><span style="font-size:12px;color:#777;">{_cop(price_raw)}</span>' if price_smmlv else ''}
+                    <span style="font-size:15px;color:#1a1a1a;">{_cop(price_raw)}</span>
                   </td>
                   <td style="padding:3px 24px 3px 0;" valign="top">
-                    <strong>Presentaci&oacute;n de ofertas</strong><br>
-                    <span style="color:{closing_color};font-weight:600;">{e(closing_text)}</span>
+                    <strong>En SMMLV</strong><br>
+                    <span style="font-size:16px;font-weight:700;color:#1a1a1a;">{e(price_smmlv) if price_smmlv else 'N/D'}</span>
                   </td>
                   <td style="padding:3px 0;" valign="top">
-                    <strong>Modalidad</strong><br>{e(row.get(f['modality']) or 'N/D')}
+                    <strong>Presentaci&oacute;n de ofertas</strong><br>
+                    <span style="color:{closing_color};font-weight:600;">{e(closing_text)}</span>
                   </td>
                 </tr>
                 <tr>
@@ -256,6 +259,11 @@ def _card(row: dict, rank: int) -> str:
                   </td>
                   <td style="padding:10px 0 3px 0;" valign="top">
                     <strong>Estado de apertura</strong><br>{e(opening_status)}
+                  </td>
+                </tr>
+                <tr>
+                  <td colspan="3" style="padding:10px 0 3px 0;" valign="top">
+                    <strong>Modalidad</strong><br>{e(row.get(f['modality']) or 'N/D')}
                   </td>
                 </tr>
               </table>
