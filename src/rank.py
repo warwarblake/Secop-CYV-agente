@@ -56,8 +56,18 @@ PERFIL DE LA EMPRESA:
 A continuacion hay {n} procesos de contratacion publica abiertos en la region
 Caribe, obtenidos de SECOP II. Selecciona los {top_n} que mejor se ajustan.
 
+Antes de seleccionar cualquier proceso, verifica su experiencia tecnica:
+compara el "Objeto" y la "Descripcion" del proceso contra CADA una de las
+LINEAS DE NEGOCIO PRINCIPALES listadas en el perfil, y contra los proyectos
+anteriores mencionados ahi (canalizacion de arroyos, colectores, vias,
+espacio publico, escenarios deportivos, edificaciones institucionales,
+restauracion patrimonial, etc). Un proceso solo debe entrar en la seleccion
+final si coincide claramente con al menos una de esas lineas. Es preferible
+devolver menos de {top_n} elementos que forzar una coincidencia debil.
+
 Criterios de seleccion, en orden de importancia:
-1. Coincidencia tecnica con las lineas de negocio de la empresa.
+1. Coincidencia tecnica verificada con las lineas de negocio de la empresa
+   (ver verificacion arriba -- esto no es opcional).
 2. Cercania geografica. Barranquilla y el resto del Atlantico pesan mas que
    los demas departamentos; luego Cartagena y Santa Marta.
 3. Valor dentro o cerca del rango historico de la empresa.
@@ -76,8 +86,25 @@ codigo. Formato exacto:
     "resumen": "UNA o DOS frases en espanol claro explicando que se va a
                 construir. Nada de jerga contractual. Como se lo explicarias
                 a alguien en treinta segundos.",
-    "encaje": "Una o dos frases sobre por que encaja con la experiencia
-               de la empresa.",
+    "encaje": "Una o dos frases sobre por que encaja, nombrando
+               EXPLICITAMENTE la linea de negocio del perfil con la que
+               coincide (ej: 'obras hidraulicas urbanas', 'espacio publico
+               y urbanismo'). Prohibido responder con una frase generica
+               que aplicaria igual a cualquier proceso -- si no puedes
+               nombrar la linea de negocio especifica, ese proceso no
+               deberia estar en la seleccion.",
+    "proyectos_relacionados": "Nombra el o los proyectos anteriores de CYV
+                mencionados en el perfil que sean mas comparables en tipo
+                de obra y magnitud (por ejemplo: canalizacion del arroyo de
+                la calle 84, colector central de aguas lluvias en Monteria,
+                Plaza de la Intendencia Fluvial, Parque Estadio de
+                Atletismo en Cartagena, proyecto Bellas Artes, proyecto K7).
+                Se especifico sobre por que ese antecedente es comparable
+                (mismo tipo de obra, magnitud similar, misma region). Escribe
+                exactamente 'Sin antecedente directo comparable en el
+                perfil actual.' UNICAMENTE si de verdad ningun proyecto
+                listado en el perfil se parece, despues de haber revisado
+                todos.",
     "experiencia_estimada": "En lenguaje sencillo, que experiencia
                 probablemente exigira el pliego: tipo de obra similar,
                 cuantos contratos anteriores, y que magnitud. Basate en el
@@ -93,7 +120,8 @@ como si fueran textuales del pliego. Usa lenguaje de probabilidad
 ("probablemente exigira", "es tipico que pidan").
 
 El campo "indice" debe ser el numero entre corchetes del proceso. Devuelve
-exactamente {top_n} elementos, ordenados del mejor al menos bueno.
+como maximo {top_n} elementos, ordenados del mejor al menos bueno, y menos
+si no hay suficientes procesos que superen la verificacion de experiencia.
 """
 
 
@@ -148,6 +176,7 @@ def rank(candidates: list[dict]) -> list[dict]:
                 **row,
                 "_resumen": "",
                 "_encaje": "",
+                "_proyectos_relacionados": "",
                 "_experiencia": "Requiere revisar el pliego.",
                 "_prioridad": "media",
                 "_alerta": "",
@@ -163,6 +192,7 @@ def rank(candidates: list[dict]) -> list[dict]:
         row = dict(candidates[idx])
         row["_resumen"] = item.get("resumen", "")
         row["_encaje"] = item.get("encaje", "")
+        row["_proyectos_relacionados"] = item.get("proyectos_relacionados", "")
         row["_experiencia"] = item.get("experiencia_estimada", "")
         row["_prioridad"] = item.get("prioridad", "media")
         row["_alerta"] = item.get("alerta", "")
