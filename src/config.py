@@ -36,16 +36,33 @@ FIELDS = {
     "modality":     "modalidad_de_contratacion",
     "base_price":   "precio_base",
     "published":    "fecha_de_publicacion_del",
-    "closes":       "fecha_de_recepcion_de",
     "duration":     "duracion",
     "duration_unit": "unidad_de_duracion",
-    # Bid-submission deadline (what SECOP's UI calls "Presentacion de
-    # Ofertas"). Left as None until confirmed against real metadata --
-    # run `python main.py --inspect` and look at the "mentions
-    # offers/deadline/reception" section it prints, then paste the
-    # correct fieldName here. Do NOT guess: an accidental wrong field
-    # here could show Claudia a fabricated deadline.
-    "closes":       None,
+
+    # Bid-submission deadline -- what SECOP's UI calls "Presentacion de
+    # Ofertas". VERIFIED against live metadata and real data, not guessed:
+    # the dataset labels this column "Fecha de Recepcion de Respuestas",
+    # and it was populated on 7/7 Licitacion Publica + Obra processes
+    # published in the six target departments since 2026-05-01.
+    #
+    # NOTE: this key used to be declared twice in this dict -- once here and
+    # again below as None -- and the later None silently won, which is why
+    # the email showed "Verificar en SECOP" for every process. Keep exactly
+    # one "closes" entry.
+    "closes":       "fecha_de_recepcion_de",
+
+    # Opening of the received bids. These are NOT the "acto administrativo
+    # de apertura" (the resolution that formally opens the process) -- that
+    # document's date is not published in this dataset at all, it lives in
+    # the pliego PDF. These two are the opening of the *responses*, and both
+    # fall AFTER the submission deadline above:
+    #   - opens_responses: "Fecha de Apertura de Respuesta"  (scheduled)
+    #   - opens_effective: "Fecha de Apertura Efectiva"      (actual)
+    # Both were populated on 7/7 of the same sample.
+    "opens_responses": "fecha_de_apertura_de_respuesta",
+    "opens_effective": "fecha_de_apertura_efectiva",
+    "opening_status":  "estado_de_apertura_del_proceso",
+
     "unspsc":       "codigo_principal_de_categoria",
     "contract_type": "tipo_de_contrato",
     "url":          "urlproceso",
@@ -100,6 +117,21 @@ TARGET_DEPARTMENTS = [
     "cordoba",
     "cesar",
 ]
+
+# ---------------------------------------------------------------------------
+# SMMLV (salario minimo mensual legal vigente)
+#
+# Pliegos express experience and capacity requirements in SMMLV multiples,
+# so showing the base price in SMMLV lets Claudia compare a process directly
+# against the thresholds written in the pliego.
+#
+# !! THIS CHANGES EVERY JANUARY !!  The Colombian government sets a new
+# SMMLV by decree each year. If this is stale, every figure in the email is
+# wrong by the size of the annual increase -- and wrong quietly, because
+# nothing will error. Update it here and nowhere else, and update
+# SMMLV_YEAR with it so the email can show which year's value was used.
+SMMLV_COP = 1_705_950
+SMMLV_YEAR = 2026
 
 # ---------------------------------------------------------------------------
 # Hard filters

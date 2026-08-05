@@ -49,6 +49,44 @@ def _cop(value) -> str:
         return "Valor no publicado"
 
 
+def _smmlv(value) -> str:
+    """
+    Base price expressed in SMMLV multiples, which is the unit pliegos use
+    for experience and capacity thresholds.
+
+    Real obra publica in these six departments lands between roughly 500 and
+    95,000 SMMLV, so this is always formatted as a whole number with a
+    thousands separator. One decimal place would be noise at this magnitude.
+    """
+    try:
+        n = float(value) / config.SMMLV_COP
+    except (TypeError, ValueError, ZeroDivisionError):
+        return ""
+    return f"{n:,.0f} SMMLV"
+
+
+def _apertura_note(row: dict) -> str:
+    """
+    Scheduled opening of the received bids, falling back to the effective
+    opening date when the scheduled one is missing. Returns "" when neither
+    is published so the caller can omit the row entirely rather than print
+    a blank label.
+
+    This is deliberately NOT labelled "acto administrativo de apertura" --
+    that document's date is not in the open dataset (it lives in the pliego).
+    Calling it that here would be inventing a data point.
+    """
+    f = config.FIELDS
+    for key in ("opens_responses", "opens_effective"):
+        field = f.get(key)
+        if not field:
+            continue
+        raw = row.get(field)
+        if raw:
+            return _date(raw)
+    return ""
+
+
 def _date(value) -> str:
     if not value:
         return "No publicada"
@@ -147,6 +185,9 @@ def _card(row: dict, rank: int) -> str:
     color = PRIORITY_COLORS.get(priority, "#6b6b6b")
     badge = _tracking_badge(row)
     closing_text, closing_color = _closing_note(row)
+    apertura = _apertura_note(row)
+    price_raw = row.get(f["base_price"])
+    price_smmlv = _smmlv(price_raw)
 
     url = _extract_url(row.get(f["url"]))
     link = (
@@ -184,10 +225,20 @@ def _card(row: dict, rank: int) -> str:
             <tr><td style="padding:12px 0 0 0;">
               <table cellpadding="0" cellspacing="0" style="font-size:13px;color:#333;">
                 <tr>
-                  <td style="padding:3px 24px 3px 0;"><strong>Valor base</strong><br>{_cop(row.get(f['base_price']))}</td>
-                  <td style="padding:3px 24px 3px 0;"><strong>Presentaci&oacute;n de ofertas</strong><br><span style="color:{closing_color};font-weight:600;">{e(closing_text)}</span></td>
-                  <td style="padding:3px 0;"><strong>Modalidad</strong><br>{e(row.get(f['modality']) or 'N/D')}</td>
+                  <td style="padding:3px 24px 3px 0;" valign="top">
+                    <strong>Valor base</strong><br>
+                    <span style="font-size:16px;font-weight:700;color:#1a1a1a;">{e(price_smmlv) if price_smmlv else _cop(price_raw)}</span>
+                    {f'<br><span style="font-size:12px;color:#777;">{_cop(price_raw)}</span>' if price_smmlv else ''}
+                  </td>
+                  <td style="padding:3px 24px 3px 0;" valign="top">
+                    <strong>Presentaci&oacute;n de ofertas</strong><br>
+                    <span style="color:{closing_color};font-weight:600;">{e(closing_text)}</span>
+                  </td>
+                  <td style="padding:3px 0;" valign="top">
+                    <strong>Modalidad</strong><br>{e(row.get(f['modality']) or 'N/D')}
+                  </td>
                 </tr>
+                {f'<tr><td style="padding:10px 24px 3px 0;" valign="top"><strong>Apertura de ofertas</strong><br>{e(apertura)}</td><td colspan="2" style="padding:10px 0 3px 0;" valign="top"><strong>Estado de apertura</strong><br>{e(row.get(f.get("opening_status") or "", "") or "N/D")}</td></tr>' if apertura else ''}
               </table>
             </td></tr>
             <tr><td style="padding:14px 0 0 0;font-size:14px;line-height:1.55;color:#2a2a2a;">
@@ -262,6 +313,13 @@ def render(rows: list[dict], stats: dict) -> str:
     (datos.gov.co, conjunto {config.DATASET_ID}). Los valores, fechas y enlaces
     provienen directamente de SECOP II. Verifique siempre el pliego de
     condiciones oficial antes de tomar decisiones.
+    <br><br>
+    Los valores en SMMLV se calculan sobre un salario minimo de
+    {_cop(config.SMMLV_COP)} ({config.SMMLV_YEAR}) y se redondean al entero
+    mas cercano. &laquo;Apertura de ofertas&raquo; es la apertura de las
+    propuestas recibidas, no el acto administrativo de apertura del proceso:
+    esa fecha no se publica en los datos abiertos y debe consultarse en el
+    pliego.
     <br><span style="color:#aaa;">Generado para CYV Constructora S.A.S.</span>
   </td></tr>
 
