@@ -36,9 +36,9 @@ def _logo_data_uri() -> str:
         return ""
 
 PRIORITY_COLORS = {
-    "alta": "#0f7b3f",
-    "media": "#8a6d1f",
-    "baja": "#6b6b6b",
+    "alta": "#2d5016",
+    "media": "#d97706",
+    "baja": "#64748b",
 }
 
 
@@ -150,63 +150,62 @@ def _card(row: dict, rank: int) -> str:
 
     url = _extract_url(row.get(f["url"]))
     link = (
-        f'<a href="{e(url)}" style="color:#1a5490;text-decoration:none;font-weight:600;">'
-        f"Ver proceso en SECOP II &rarr;</a>"
+        f'<a href="{e(url)}" style="color:{_BRAND_YELLOW};text-decoration:none;font-weight:700;font-size:14px;">'
+        f"Ver proceso en SECOP II →</a>"
         if url
         else '<span style="color:#999;">Enlace no disponible</span>'
     )
 
     alert = row.get("_alerta") or ""
     alert_html = (
-        f'<tr><td style="padding:8px 0 0 0;font-size:13px;color:#8a2b2b;">'
+        f'<tr><td style="padding:12px 0 0 0;font-size:13px;color:#c23636;border-top:1px solid #efe;border-left:3px solid #c23636;padding-left:12px;">'
         f"<strong>Alerta:</strong> {e(alert)}</td></tr>"
         if alert.strip()
         else ""
     )
 
     return f"""
-    <tr><td style="padding:0 0 20px 0;">
-      <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e0ddd6;border-left:4px solid {color};background:#ffffff;">
-        <tr><td style="padding:18px 20px;">
+    <tr><td style="padding:0 0 16px 0;">
+      <table width="100%" cellpadding="0" cellspacing="0" style="border-left:5px solid {color};background:#fff;box-shadow:0 1px 3px rgba(0,0,0,0.08);">
+        <tr><td style="padding:20px 24px;">
           <table width="100%" cellpadding="0" cellspacing="0">
             <tr>
-              <td style="font-size:12px;letter-spacing:1px;text-transform:uppercase;color:{color};font-weight:700;">
-                #{rank} &middot; Prioridad {e(priority)}{f' &middot; {e(badge)}' if badge else ''}
+              <td style="font-size:11px;font-weight:700;color:{color};text-transform:none;">
+                #{rank} • Prioridad {e(priority).lower()}{f' • {e(badge)}' if badge else ''}
               </td>
             </tr>
-            <tr><td style="padding:6px 0 0 0;font-size:17px;line-height:1.35;font-weight:600;color:#1a1a1a;">
+            <tr><td style="padding:8px 0 0 0;font-size:18px;line-height:1.3;font-weight:700;color:#1a1a1a;font-family:Arial,Helvetica,sans-serif;">
               {e(row.get(f['title']) or 'Sin titulo')}
             </td></tr>
-            <tr><td style="padding:6px 0 0 0;font-size:13px;color:#555;">
-              {e(row.get(f['entity']) or 'Entidad no publicada')}<br>
-              {e(row.get(f['city']) or '')}, {e(row.get(f['department']) or '')}
+            <tr><td style="padding:4px 0 0 0;font-size:12px;color:#666;font-family:Arial,Helvetica,sans-serif;">
+              {e(row.get(f['entity']) or 'Entidad no publicada')} • {e(row.get(f['city']) or '')} {f'/ {e(row.get(f["department"] or ""))}' if row.get(f["department"]) else ''}
             </td></tr>
-            <tr><td style="padding:12px 0 0 0;">
-              <table cellpadding="0" cellspacing="0" style="font-size:13px;color:#333;">
+            <tr><td style="padding:14px 0 0 0;">
+              <table cellpadding="0" cellspacing="0" style="font-size:12px;color:#333;font-family:Arial,Helvetica,sans-serif;">
                 <tr>
-                  <td style="padding:3px 24px 3px 0;"><strong>Valor base</strong><br>{_cop(row.get(f['base_price']))}</td>
-                  <td style="padding:3px 24px 3px 0;"><strong>Presentaci&oacute;n de ofertas</strong><br><span style="color:{closing_color};font-weight:600;">{e(closing_text)}</span></td>
-                  <td style="padding:3px 0;"><strong>Modalidad</strong><br>{e(row.get(f['modality']) or 'N/D')}</td>
+                  <td style="padding:0 20px 0 0;"><strong>Valor</strong><br style="line-height:1.3;"><span style="color:#1a1a1a;font-size:13px;font-weight:600;">{_cop(row.get(f['base_price']))}</span></td>
+                  <td style="padding:0 20px 0 0;"><strong>Cierre</strong><br style="line-height:1.3;"><span style="color:{closing_color};font-weight:600;font-size:13px;">{e(closing_text)}</span></td>
+                  <td><strong>Modalidad</strong><br style="line-height:1.3;"><span style="font-size:13px;">{e(row.get(f['modality']) or 'N/D')}</span></td>
                 </tr>
               </table>
             </td></tr>
-            <tr><td style="padding:14px 0 0 0;font-size:14px;line-height:1.55;color:#2a2a2a;">
-              <strong style="font-size:11px;letter-spacing:1px;text-transform:uppercase;color:#777;">De que se trata</strong><br>
+            <tr><td style="padding:14px 0 0 0;border-top:1px solid #f0f0f0;font-size:13px;line-height:1.6;color:#2a2a2a;font-family:Arial,Helvetica,sans-serif;">
+              <strong style="display:block;font-size:11px;color:#1a1a1a;margin-bottom:4px;font-weight:700;">De qué se trata</strong>
               {e(row.get('_resumen') or row.get(f['description']) or '')[:400]}
             </td></tr>
 
-            <tr><td style="padding:12px 0 0 0;font-size:14px;line-height:1.55;color:#2a2a2a;">
-              <strong style="font-size:11px;letter-spacing:1px;text-transform:uppercase;color:#777;">Por que encaja</strong><br>
-              {e(row.get('_encaje') or 'Coincide con las lineas de negocio de la empresa.')}
+            <tr><td style="padding:14px 0 0 0;font-size:13px;line-height:1.6;color:#2a2a2a;font-family:Arial,Helvetica,sans-serif;">
+              <strong style="display:block;font-size:11px;color:#1a1a1a;margin-bottom:4px;font-weight:700;">Por qué encaja</strong>
+              {e(row.get('_encaje') or 'Coincide con las líneas de negocio.')}
             </td></tr>
 
-            <tr><td style="padding:12px 0 0 0;font-size:14px;line-height:1.55;color:#2a2a2a;">
-              <strong style="font-size:11px;letter-spacing:1px;text-transform:uppercase;color:#777;">Proyectos previos de CYV relacionados</strong><br>
-              {e(row.get('_proyectos_relacionados') or 'Sin antecedente directo comparable.')}
+            <tr><td style="padding:14px 0 0 0;font-size:13px;line-height:1.6;color:#2a2a2a;font-family:Arial,Helvetica,sans-serif;">
+              <strong style="display:block;font-size:11px;color:#1a1a1a;margin-bottom:4px;font-weight:700;">Experiencia relevante</strong>
+              {e(row.get('_proyectos_relacionados') or 'Revisar el pliego de condiciones.')}
             </td></tr>
 
             {alert_html}
-            <tr><td style="padding:14px 0 0 0;font-size:14px;">{link}</td></tr>
+            <tr><td style="padding:14px 0 0 0;">{link}</td></tr>
           </table>
         </td></tr>
       </table>
@@ -220,49 +219,41 @@ def render(rows: list[dict], stats: dict) -> str:
     logo_uri = _logo_data_uri()
 
     return f"""<!DOCTYPE html>
-<html><body style="margin:0;padding:0;background:#f4f2ed;font-family:Georgia,'Times New Roman',serif;">
-<table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f2ed;padding:28px 12px;">
+<html><body style="margin:0;padding:0;background:#f5f5f5;font-family:Arial,Helvetica,'Trebuchet MS',sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f5f5;padding:24px 12px;">
 <tr><td align="center">
 <table width="640" cellpadding="0" cellspacing="0" style="max-width:640px;">
 
-  <tr><td style="padding:0 0 18px 0;">
+  <tr><td style="padding:0 0 24px 0;background:#fff;padding:24px;border-left:5px solid {_BRAND_YELLOW};">
     <table width="100%" cellpadding="0" cellspacing="0">
       <tr>
-        <td valign="top">
-          <div style="font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#777;">
-            Reporte diario de oportunidades
+        <td valign="top" width="100%">
+          <div style="font-size:12px;font-weight:700;color:{_BRAND_YELLOW};letter-spacing:0.5px;">
+            REPORTE DIARIO
           </div>
-          <div style="font-size:26px;font-weight:700;color:#1a1a1a;padding-top:6px;">
-            Licitaciones region Caribe
+          <div style="font-size:28px;font-weight:700;color:#1a1a1a;padding-top:4px;line-height:1.2;">
+            Oportunidades<br>Región Caribe
           </div>
-          <div style="font-size:13px;color:#666;padding-top:6px;">
-            {today} &middot; Fuente: SECOP II
+          <div style="font-size:13px;color:#666;padding-top:10px;">
+            {today}
           </div>
         </td>
-        {f'<td valign="top" align="right" width="130"><img src="{logo_uri}" width="120" alt="CYV Constructora" style="display:block;border:0;"></td>' if logo_uri else ''}
+        {f'<td valign="middle" align="right" width="110" style="padding-left:16px;"><img src="{logo_uri}" width="100" alt="CYV" style="display:block;border:0;"></td>' if logo_uri else ''}
       </tr>
     </table>
   </td></tr>
 
-  <tr><td style="height:4px;line-height:4px;font-size:0;background-color:{_BRAND_YELLOW};">&nbsp;</td></tr>
-
-  <tr><td style="padding:20px 0 22px 0;font-size:14px;line-height:1.6;color:#444;">
-    Se revisaron <strong>{stats['scanned']}</strong> procesos publicados en los
-    ultimos {config.LOOKBACK_DAYS} dias en Atlantico, Bolivar, Magdalena, Sucre,
-    Cordoba y Cesar. <strong>{stats['candidates']}</strong> corresponden a obra civil
-    por encima de {_cop(config.MIN_BASE_PRICE_COP)}, de los cuales
-    <strong>{stats['new']}</strong> son nuevos desde el ultimo reporte.
-    A continuacion los {len(rows)} mas relevantes.
+  <tr><td style="padding:20px 0 0 0;font-size:13px;line-height:1.8;color:#444;font-family:Arial,Helvetica,sans-serif;">
+    <strong>{stats['scanned']} procesos</strong> analizados en los últimos {config.LOOKBACK_DAYS} días. <strong>{stats['candidates']}</strong> clasifican como obra civil por encima de {_cop(config.MIN_BASE_PRICE_COP)}, de los cuales <strong>{stats['new']}</strong> son nuevos. A continuación, los <strong>{len(rows)} mejores</strong> oportunidades.
   </td></tr>
 
-  {cards}
+  <tr><td style="padding:16px 0 0 0;">
+    {cards}
+  </td></tr>
 
-  <tr><td style="padding:18px 0 0 0;border-top:2px solid {_BRAND_YELLOW};font-size:11px;line-height:1.6;color:#888;">
-    Datos obtenidos del portal de datos abiertos de Colombia Compra Eficiente
-    (datos.gov.co, conjunto {config.DATASET_ID}). Los valores, fechas y enlaces
-    provienen directamente de SECOP II. Verifique siempre el pliego de
-    condiciones oficial antes de tomar decisiones.
-    <br><span style="color:#aaa;">Generado para CYV Constructora S.A.S.</span>
+  <tr><td style="padding:20px 0 0 0;font-size:11px;line-height:1.8;color:#666;border-top:1px solid #e0e0e0;padding-top:20px;font-family:Arial,Helvetica,sans-serif;">
+    <strong style="color:#1a1a1a;">Fuente:</strong> Datos abiertos de Colombia Compra Eficiente (SECOP II, conjunto {config.DATASET_ID}). Todos los valores, fechas y enlaces provienen directamente del portal oficial. Verifique siempre el pliego de condiciones antes de tomar decisiones.<br>
+    <span style="color:#999;margin-top:8px;display:block;padding-top:8px;">CYV Constructora S.A.S. • Licitaciones Región Caribe</span>
   </td></tr>
 
 </table>
