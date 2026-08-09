@@ -2,9 +2,32 @@ name: Reporte diario SECOP
 
 on:
   schedule:
-    # 13:00 UTC = 08:00 America/Bogota (Colombia does not observe DST,
-    # so this is stable year-round). GitHub may run it a few minutes late.
-    - cron: "0 13 * * *"
+    # FOUR attempts, not one. GitHub's scheduler is best-effort and under load
+    # it delays or silently drops runs -- measured on this repo, a single
+    # "0 13 * * *" entry actually executed at 18:11, 18:18, 15:39 and 14:19 UTC
+    # on four consecutive days (1-5 hours late), and was dropped outright once.
+    #
+    # Two things make that survivable:
+    #   1. None of these sit on :00. The top of the hour is when every cron on
+    #      GitHub fires at once, and it is the worst slot to ask for.
+    #   2. main.py is passed --if-not-sent-today, so whichever attempt runs
+    #      first sends and the rest exit immediately. Claudia cannot get two
+    #      emails; the extra entries only buy resilience against a late or
+    #      dropped run.
+    #
+    # Colombia does not observe DST, so UTC-5 holds year-round.
+    - cron: "50 12 * * *"   # 07:50 Bogota
+    - cron: "10 13 * * *"   # 08:10 Bogota
+    - cron: "35 13 * * *"   # 08:35 Bogota
+    - cron: "20 14 * * *"   # 09:20 Bogota -- last-resort catch
+
+# Serialize runs. With four cron entries plus manual dispatch, two jobs could
+# otherwise overlap, both read last_sent_date before either wrote it, and both
+# send. Queueing rather than cancelling means a delayed run still gets its turn
+# and then no-ops via the guard.
+concurrency:
+  group: reporte-diario-secop
+  cancel-in-progress: false
   workflow_dispatch:   # lets you trigger a run manually from the Actions tab
     inputs:
       mode:
@@ -45,7 +68,13 @@ jobs:
           REPORT_CC: ${{ vars.REPORT_CC }}
         run: |
           MODE="${{ inputs.mode }}"
-          if [ "$MODE" = "send" ] || [ -z "$MODE" ]; then
+          if [ -z "$MODE" ]; then
+            # Scheduled run: guard against double-sending, since several
+            # cron attempts fire each morning and only the first should mail.
+            python main.py --if-not-sent-today
+          elif [ "$MODE" = "send" ]; then
+            # Manual "send" from the Actions tab: always send, no guard, so
+            # you can force a resend after a failure or a config change.
             python main.py
           else
             python main.py --$MODE
@@ -65,4 +94,8 @@ jobs:
           git config user.email "actions@github.com"
           git add state/seen.json
           git diff --staged --quiet || git commit -m "state: procesos reportados $(date -u +%F)"
+          # Rebase before pushing: the checkout can be behind if another run
+          # (or a code change) landed while this job was queued, and a plain
+          # push would then be rejected and lose the send stamp.
+          git pull --rebase --quiet origin main || true
           git push

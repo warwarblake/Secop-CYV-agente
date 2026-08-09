@@ -33,12 +33,34 @@ def load_seen() -> dict:
         return {}
 
 
-def save_seen(seen: dict) -> None:
+def load_last_sent() -> str:
+    """
+    Bogota date (ISO) of the last report actually emailed, or "" if never.
+
+    This exists so the workflow can schedule SEVERAL attempts per morning
+    without any risk of Claudia getting the same report twice. GitHub's cron
+    is best-effort and has been running this job 1-5 hours late (and dropping
+    it entirely some days), so one scheduled attempt is not reliable enough.
+    """
+    if not STATE_FILE.exists():
+        return ""
+    try:
+        return json.loads(STATE_FILE.read_text()).get("last_sent_date", "")
+    except (json.JSONDecodeError, OSError):
+        return ""
+
+
+def save_seen(seen: dict, last_sent_date: str | None = None) -> None:
     STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
+    # Preserve any existing last_sent_date when this call isn't a send
+    # (e.g. a --dry-run), so a dry run can never make the guard think
+    # today's real report already went out.
+    existing = load_last_sent()
     STATE_FILE.write_text(
         json.dumps(
             {
                 "updated": datetime.now(timezone.utc).isoformat(),
+                "last_sent_date": last_sent_date or existing,
                 "process_ids": seen,
             },
             indent=2,
@@ -131,6 +153,19 @@ def main() -> int:
 
     dry_run = "--dry-run" in args
 
+    # Scheduled runs pass --if-not-sent-today so the morning can be attempted
+    # several times without ever double-sending. Manual "send" runs from the
+    # Actions tab deliberately do NOT pass it, so you can always force a
+    # resend. Checked before any API work so a duplicate attempt is cheap.
+    if "--if-not-sent-today" in args and not dry_run:
+        today_str = datetime.now(BOGOTA).date().isoformat()
+        last_sent = load_last_sent()
+        if last_sent == today_str:
+            print(f"Report for {today_str} already sent. Nothing to do.")
+            return 0
+        print(f"No report sent yet today ({today_str}); proceeding. "
+              f"Last sent: {last_sent or 'never'}")
+
     candidates = secop.get_candidates()
     seen = load_seen()  # {process_id: first_seen_date_iso}
 
@@ -185,7 +220,10 @@ def main() -> int:
 
     today = datetime.now(BOGOTA).strftime("%d/%m/%Y")
     report.send(html_body, f"Oportunidades SECOP II - Region Caribe - {today}")
-    save_seen(new_seen)
+    # Stamp the send date only after send() returns without raising, so a
+    # failed delivery leaves the guard open for the next scheduled attempt
+    # rather than marking the day done.
+    save_seen(new_seen, last_sent_date=today_str)
     print(f"Sent {len(selected)} opportunities.")
     return 0
 
